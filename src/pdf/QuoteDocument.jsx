@@ -6,6 +6,7 @@ import {
   fmtDateShort,
   fmtMoney,
   fmtNumber,
+  normUnit,
   num,
   todayISO,
 } from '../lib/blocks.js'
@@ -387,7 +388,7 @@ function Table({ d }) {
           >
             <Text style={{ ...cell, width: W.code, textAlign: 'center', color: C.muted }}>{r.code}</Text>
             <Text style={{ ...cell, flex: 1 }}>{r.desc}</Text>
-            <Text style={{ ...cell, width: W.um, textAlign: 'center' }}>{r.unit}</Text>
+            <Text style={{ ...cell, width: W.um, textAlign: 'center' }}>{normUnit(r.unit)}</Text>
             <Text style={{ ...cell, width: W.qty, textAlign: 'right' }}>{String(r.qty).trim() ? fmtNumber(num(r.qty)) : ''}</Text>
             <Text style={{ ...cell, width: W.price, textAlign: 'right' }}>{String(r.price).trim() ? money(num(r.price)) : ''}</Text>
             <Text style={{ ...cell, width: W.total, textAlign: 'right', fontFamily: BOLD }}>

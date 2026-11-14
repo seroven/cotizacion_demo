@@ -13,6 +13,8 @@ import {
   calcTable,
   fmtMoney,
   nextCode,
+  normUnit,
+  unitOptions,
   uid,
 } from '../lib/blocks.js'
 import RichText from './RichText.jsx'
@@ -262,7 +264,7 @@ function ListEditor({ data, onChange }) {
 
 /* ---------------------------- tabla ---------------------------- */
 
-const COLS = 'grid grid-cols-[84px_minmax(220px,1fr)_64px_84px_96px_116px_88px] items-start gap-1.5'
+const COLS = 'grid grid-cols-[84px_minmax(220px,1fr)_78px_84px_96px_116px_88px] items-start gap-1.5'
 
 function TableEditor({ data, onChange }) {
   const calc = calcTable(data)
@@ -275,7 +277,7 @@ function TableEditor({ data, onChange }) {
     const row =
       kind === 'group'
         ? { id: uid(), kind, code: nextCode(prev, 'group'), desc: 'NUEVA CATEGORÍA' }
-        : { id: uid(), kind, code: nextCode(prev, 'item'), desc: '', unit: prev?.unit || 'und', qty: '', price: '' }
+        : { id: uid(), kind, code: nextCode(prev, 'item'), desc: '', unit: normUnit(prev?.unit) || 'UND', qty: '', price: '' }
     setRows([...data.rows, row])
   }
 
@@ -353,7 +355,14 @@ function TableEditor({ data, onChange }) {
                   placeholder="Descripción de la partida"
                   onChange={(v) => setRows(patchAt(data.rows, r.id, { desc: v }))}
                 />
-                <TextInput value={r.unit} onChange={(v) => setRows(patchAt(data.rows, r.id, { unit: v }))} />
+                <Select
+                  compact
+                  searchable
+                  aria-label="Unidad de medida"
+                  value={normUnit(r.unit)}
+                  options={unitOptions(r.unit)}
+                  onChange={(v) => setRows(patchAt(data.rows, r.id, { unit: v }))}
+                />
                 <TextInput
                   className="text-right tabular-nums"
                   inputMode="decimal"

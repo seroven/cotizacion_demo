@@ -19,7 +19,7 @@ import {
   Underline,
   Undo2,
 } from 'lucide-react'
-import { Collapse } from './ui.jsx'
+import { Collapse, Select } from './ui.jsx'
 
 const COLORS = [
   { value: '#0f172a', label: 'Negro' },
@@ -130,20 +130,21 @@ function Toolbar({ editor }) {
       </Btn>
       <Sep />
 
-      <select
+      <Select
+        variant="ghost"
         aria-label="Estilo de párrafo"
         value={headingValue(editor)}
-        onChange={(e) => {
-          const l = Number(e.target.value)
+        onChange={(v) => {
+          const l = Number(v)
           l ? ch().setHeading({ level: l }).run() : ch().setParagraph().run()
         }}
-        className="h-8 cursor-pointer rounded-lg border border-transparent bg-transparent px-2 text-xs font-semibold text-slate-600 outline-none transition hover:bg-slate-100 focus:border-indigo-300"
-      >
-        <option value="0">Texto normal</option>
-        <option value="1">Título 1</option>
-        <option value="2">Título 2</option>
-        <option value="3">Título 3</option>
-      </select>
+        options={[
+          { value: '0', label: 'Texto normal' },
+          { value: '1', label: 'Título 1', hint: 'Grande' },
+          { value: '2', label: 'Título 2', hint: 'Mediano' },
+          { value: '3', label: 'Título 3', hint: 'Pequeño' },
+        ]}
+      />
       <Sep />
 
       <Btn label="Negrita (Ctrl+B)" active={editor.isActive('bold')} onClick={() => ch().toggleBold().run()}>

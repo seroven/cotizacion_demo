@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ImageIcon, Upload, X, Check, TriangleAlert, Info } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { ImageIcon, Upload, X, Check, ChevronDown, Search, TriangleAlert, Info } from 'lucide-react'
 import { fileToDataURL } from '../lib/image.js'
 import { subscribeToasts, toast } from '../lib/toast.js'
 
@@ -44,19 +45,231 @@ export function TextArea({ value, onChange, minRows = 2, className = '', ...prop
   )
 }
 
-export function Select({ value, onChange, options, className = '' }) {
+const MENU_H = 44
+const LIST_MAX = 208 // alto máximo de la lista (≈ 5 filas); si hay más, scroll interno
+const SEARCH_H = 52
+
+const fold = (s) =>
+  String(s ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+
+/**
+ * Desplegable propio (en lugar del <select> nativo): menú en portal con alto máximo,
+ * animado, con teclado (↑ ↓ Enter Esc), tema claro/oscuro, texto de ayuda y
+ * buscador opcional (`searchable`).
+ * options: [{ value, label, hint? }]
+ */
+export function Select({
+  value,
+  onChange,
+  options,
+  className = '',
+  variant = 'field',
+  compact = false,
+  searchable = false,
+  ...rest
+}) {
+  const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [pos, setPos] = useState(null)
+  const [hi, setHi] = useState(0)
+  const [query, setQuery] = useState('')
+  const btnRef = useRef(null)
+  const menuRef = useRef(null)
+  const searchRef = useRef(null)
+  const itemRefs = useRef([])
+  const current = options.find((o) => o.value === value)
+  const ghost = variant === 'ghost'
+
+  const q = fold(query.trim())
+  const shown = searchable && q ? options.filter((o) => fold(`${o.label} ${o.hint || ''}`).includes(q)) : options
+
+  const close = () => {
+    setOpen(false)
+    setTimeout(() => setMounted(false), 140)
+  }
+
+  const openMenu = () => {
+    const r = btnRef.current.getBoundingClientRect()
+    const extra = searchable ? SEARCH_H : 0
+    const need = Math.min(LIST_MAX, options.length * MENU_H + 8) + extra + 10
+    const below = window.innerHeight - r.bottom
+    const up = below < need + 12 && r.top > below
+    const width = Math.max(r.width, 200)
+    const avail = (up ? r.top : below) - 20
+    setPos({
+      left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)),
+      minWidth: width,
+      top: up ? undefined : r.bottom + 6,
+      bottom: up ? window.innerHeight - r.top + 6 : undefined,
+      listMax: Math.max(120, Math.min(LIST_MAX, avail - extra)),
+      origin: up ? 'bottom' : 'top',
+    })
+    setQuery('')
+    const idx = options.findIndex((o) => o.value === value)
+    setHi(idx >= 0 ? idx : 0)
+    setMounted(true)
+    setOpen(true)
+  }
+
+  const choose = (o) => {
+    onChange(o.value)
+    close()
+    if (!ghost) btnRef.current?.focus()
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e) => {
+      if (!btnRef.current?.contains(e.target) && !menuRef.current?.contains(e.target)) close()
+    }
+    const onScroll = (e) => {
+      if (!menuRef.current?.contains(e.target)) close()
+    }
+    document.addEventListener('mousedown', onDown)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', close)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', close)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // el buscador toma el foco al abrir
+  useEffect(() => {
+    if (open && searchable) {
+      const t = setTimeout(() => searchRef.current?.focus(), 30)
+      return () => clearTimeout(t)
+    }
+  }, [open, searchable])
+
+  useEffect(() => {
+    if (open) itemRefs.current[hi]?.scrollIntoView({ block: 'nearest' })
+  }, [hi, open])
+
+  const onKey = (e) => {
+    const inInput = e.target.tagName === 'INPUT'
+    if (!open) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
+        e.preventDefault()
+        openMenu()
+      }
+      return
+    }
+    const last = shown.length - 1
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      close()
+      btnRef.current?.focus()
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHi((h) => Math.min(last, h + 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHi((h) => Math.max(0, h - 1))
+    } else if (!inInput && e.key === 'Home') {
+      e.preventDefault()
+      setHi(0)
+    } else if (!inInput && e.key === 'End') {
+      e.preventDefault()
+      setHi(last)
+    } else if (e.key === 'Enter' || (!inInput && e.key === ' ')) {
+      e.preventDefault()
+      if (shown[hi]) choose(shown[hi])
+    } else if (e.key === 'Tab') close()
+  }
+
   return (
-    <select
-      className={`input cursor-pointer pr-8 ${className}`}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => (open ? close() : openMenu())}
+        onKeyDown={onKey}
+        // en la barra del editor de texto no se debe robar el foco/selección
+        onMouseDown={ghost ? (e) => e.preventDefault() : undefined}
+        className={
+          ghost
+            ? `flex h-8 cursor-pointer items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-600 transition duration-150 hover:bg-slate-100 ${open ? 'bg-slate-100' : ''} ${className}`
+            : `input flex cursor-pointer items-center justify-between gap-1.5 text-left ${compact ? '!px-2' : '!pr-2.5'} ${
+                open ? '!border-indigo-400 !ring-4 !ring-indigo-100' : ''
+              } ${className}`
+        }
+        {...rest}
+      >
+        <span className="min-w-0 flex-1 truncate">{current?.label ?? (value || '')}</span>
+        <ChevronDown
+          className={`size-4 shrink-0 text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {mounted &&
+        pos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              left: pos.left,
+              top: pos.top,
+              bottom: pos.bottom,
+              minWidth: pos.minWidth,
+              transformOrigin: `${pos.origin} left`,
+            }}
+            className={`${open ? 'menu-in' : 'menu-out'} fixed z-[80] flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-surface p-1 shadow-2xl shadow-slate-900/20`}
+          >
+            {searchable && (
+              <div className="relative shrink-0 p-1 pb-1.5">
+                <Search className="pointer-events-none absolute top-1/2 left-3.5 size-3.5 -translate-y-[55%] text-slate-400" />
+                <input
+                  ref={searchRef}
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value)
+                    setHi(0)
+                  }}
+                  onKeyDown={onKey}
+                  placeholder="Buscar…"
+                  aria-label="Buscar"
+                  className="input !rounded-lg !py-1.5 !pl-8 !text-xs"
+                />
+              </div>
+            )}
+            <div role="listbox" className="min-h-0 flex-1 overflow-y-auto" style={{ maxHeight: pos.listMax }}>
+              {shown.length === 0 && (
+                <p className="px-3 py-4 text-center text-xs text-slate-400">Sin resultados para “{query}”</p>
+              )}
+              {shown.map((o, i) => (
+                <div
+                  key={o.value}
+                  ref={(el) => (itemRefs.current[i] = el)}
+                  role="option"
+                  aria-selected={o.value === value}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => setHi(i)}
+                  onClick={() => choose(o)}
+                  className={`flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors duration-100 ${
+                    i === hi ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'
+                  } ${o.value === value ? 'font-semibold' : ''}`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{o.label}</span>
+                    {o.hint && <span className="block truncate text-[11px] font-normal text-slate-400">{o.hint}</span>}
+                  </span>
+                  {o.value === value && <Check className="size-4 shrink-0 text-indigo-600" />}
+                </div>
+              ))}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   )
 }
 

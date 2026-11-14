@@ -207,7 +207,7 @@ export const BLOCK_TYPES = {
       showGroupTotals: false,
       rows: [
         { id: uid(), kind: 'group', code: '01', desc: 'CATEGORÍA' },
-        { id: uid(), kind: 'item', code: '01.01', desc: '', unit: 'und', qty: '', price: '' },
+        { id: uid(), kind: 'item', code: '01.01', desc: '', unit: 'UND', qty: '', price: '' },
       ],
       adjustments: [],
     }),
@@ -294,4 +294,56 @@ export function blockSummary(block, numbers) {
     default:
       return numbers ? '' : ''
   }
+}
+
+/* ---------- unidades de medida (lista fija para las tablas) ---------- */
+
+export const UNITS = [
+  { value: 'Ton', hint: 'Tonelada' },
+  { value: 'UND', hint: 'Unidad' },
+  { value: 'kg', hint: 'Kilogramo' },
+  { value: 'm', hint: 'Metro lineal' },
+  { value: 'm2', hint: 'Metro cuadrado' },
+  { value: 'm3', hint: 'Metro cúbico' },
+  { value: 'GLB', hint: 'Global' },
+  { value: 'Pza', hint: 'Pieza' },
+  { value: 'Jgo', hint: 'Juego' },
+  { value: 'Hr', hint: 'Hora' },
+  { value: 'Día', hint: 'Día' },
+  { value: 'Mes', hint: 'Mes' },
+  { value: 'Lt', hint: 'Litro' },
+  { value: 'Gal', hint: 'Galón' },
+  { value: '%', hint: 'Porcentaje' },
+].map((u) => ({ ...u, label: u.value }))
+
+const UNIT_ALIASES = {
+  und: 'UND', unid: 'UND', unidad: 'UND', unidades: 'UND', u: 'UND',
+  tn: 'Ton', ton: 'Ton', tons: 'Ton', tonelada: 'Ton', toneladas: 'Ton',
+  kgs: 'kg', kilo: 'kg', kilos: 'kg',
+  ml: 'm', mt: 'm', mts: 'm', metro: 'm', metros: 'm',
+  'm²': 'm2', mt2: 'm2', 'm³': 'm3', mt3: 'm3',
+  glob: 'GLB', global: 'GLB', gl: 'GLB', glb: 'GLB',
+  pz: 'Pza', pieza: 'Pza', piezas: 'Pza', jgo: 'Jgo', juego: 'Jgo',
+  h: 'Hr', hr: 'Hr', hrs: 'Hr', hora: 'Hr', horas: 'Hr',
+  dia: 'Día', días: 'Día', dias: 'Día', día: 'Día', mes: 'Mes', meses: 'Mes',
+  lt: 'Lt', litro: 'Lt', litros: 'Lt', gal: 'Gal', galon: 'Gal', galón: 'Gal',
+}
+
+/** Lleva lo escrito a la unidad canónica ("und" → "UND"); si no la reconoce, lo deja tal cual. */
+export function normUnit(v) {
+  const raw = String(v ?? '').trim()
+  if (!raw) return ''
+  const low = raw.toLowerCase()
+  const exact = UNITS.find((u) => u.value.toLowerCase() === low)
+  if (exact) return exact.value
+  return UNIT_ALIASES[low] ?? raw
+}
+
+/** Opciones del desplegable; si la fila trae una unidad fuera de la lista se muestra aparte para no perderla. */
+export function unitOptions(current) {
+  const n = normUnit(current)
+  if (n && !UNITS.some((u) => u.value === n)) {
+    return [{ value: n, label: n, hint: 'Valor anterior (fuera de la lista)' }, ...UNITS]
+  }
+  return UNITS
 }

@@ -313,3 +313,28 @@ body {
   transform-origin: left center;
   animation: grow-line 0.16s ease-out both;
 }
+
+/* menús desplegables propios */
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes menu-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+}
+.menu-in {
+  animation: menu-in 0.14s cubic-bezier(0.2, 0.9, 0.3, 1.05) both;
+}
+.menu-out {
+  animation: menu-out 0.12s ease-in forwards;
+  pointer-events: none;
+}
